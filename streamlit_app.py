@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import math
 from pathlib import Path
+import altair as alt
 
 # Set the title and favicon that appear in the Browser's tab bar.
 st.set_page_config(
@@ -93,13 +94,23 @@ filtered_elec_df = elec_df[
 st.header('Plots', divider='gray')
 st.subheader('Net Consumption (billions of kWh)', divider='gray')
 
+# Toggle for logarithmic scale
+log_scale = st.checkbox("Logarithmic scale", value=False)
 
-st.line_chart(
-    filtered_elec_df,
-    x='Year',
-    y='net consumption',
-    color='Country',
+# Set y-axis scale based on the toggle
+y_axis_scale = alt.Scale(type='log') if log_scale else alt.Scale(type='linear')
+
+# Create the line chart using Altair with the selected y-axis scale
+line_chart = alt.Chart(filtered_elec_df).mark_line().encode(
+    x=alt.X('Year:O', title='Year'),
+    y=alt.Y('net consumption:Q', scale=y_axis_scale, title='Net Consumption (billions of kWh)'),
+    color='Country:N'
+).properties(
+    width=700,
+    height=400
 )
+
+st.altair_chart(line_chart, use_container_width=True)
 
 first_year = elec_df[elec_df['Year'] == from_year]
 last_year = elec_df[elec_df['Year'] == to_year]
