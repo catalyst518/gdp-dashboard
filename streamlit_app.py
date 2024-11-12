@@ -55,7 +55,15 @@ elec_df = get_electricity_data()
 
 Browse global electricity statistics from [Kaggle](https://www.kaggle.com/datasets/akhiljethwa/global-electricity-statistics/data).
 
-The data includes yearly data from 1980 to 2021 and contains measurements such as net generation (billion kWh), net consumption (billion kWh), and installed capacity (million kW).
+The data includes yearly data from 1980 to 2021 and contains the following features:
+
+- Net Generation (billion kWh)
+- Net Consumption (billion kWh)
+- Imports (billion kWh)
+- Exports (billion kWh)
+- Net Imports (billion kWh)
+- Installed Capacity (million kW)
+- Distribution Losses (billion kWh)
 '''
 
 st.header('Raw Data', divider='gray')
