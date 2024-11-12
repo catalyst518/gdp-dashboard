@@ -64,25 +64,36 @@ st.dataframe(elec_df)
 
 st.header('Settings', divider='gray')
 
+# Year selection slider
 min_value = elec_df['Year'].min()
 max_value = elec_df['Year'].max()
-
 from_year, to_year = st.slider(
     'Which years are you interested in?',
     min_value=min_value,
     max_value=max_value,
-    value=[min_value, max_value])
+    value=[min_value, max_value]
+)
 
+# Country selection multiselect
 countries = elec_df['Country'].unique()
-
-if not len(countries):
-    st.warning("Select at least one country")
-
 selected_countries = st.multiselect(
     'Which countries would you like to view?',
     countries,
-    ['United States', 'France', 'China', 'India', 'Japan'])
+    ['United States', 'China', 'India', 'Canada']
+)
 
+# Feature selection checkboxes in two columns
+'''Select features to plot'''
+available_features = [col for col in elec_df.columns if col not in ['Country', 'Region', 'Year']]
+selected_features = []
+
+# Create two columns for feature checkboxes
+col1, col2 = st.columns(2)
+for i, feature in enumerate(available_features):
+    # Alternate placing checkboxes in col1 and col2
+    with (col1 if feature in ['imports', 'exports','net imports', 'distribution losses'] else col2):
+        if st.checkbox(feature.replace("_", " ").title(), key=f"feature_{feature}"):
+            selected_features.append(feature)
 
 # Filter the data
 filtered_elec_df = elec_df[
@@ -91,51 +102,64 @@ filtered_elec_df = elec_df[
     & (from_year <= elec_df['Year'])
 ]
 
+first_year = filtered_elec_df[filtered_elec_df['Year'] == from_year]
+last_year = filtered_elec_df[filtered_elec_df['Year'] == to_year]
+
+# Plot section
 st.header('Plots', divider='gray')
-st.subheader('Net Consumption (billions of kWh)', divider='gray')
 
-# Toggle for logarithmic scale
-log_scale = st.checkbox("Logarithmic scale", value=False)
 
-# Set y-axis scale based on the toggle
-y_axis_scale = alt.Scale(type='log') if log_scale else alt.Scale(type='linear')
+# Loop through selected features to create separate plots
+for feature in selected_features:
+    units='kWh'
+    long_units='billions of kWh'
+    short_units="B"
+    if feature=="installed capacity":
+        units='kW'
+        long_units='millions of kW'
+        short_units="M"
+    st.subheader(f'{feature.replace("_", " ").title()} ({long_units})', divider='gray')
+    
+    # Create the line chart for each selected feature
+    log_scale = st.checkbox("Logarithmic scale", key=f"{feature}_log")
+    y_axis_scale = alt.Scale(type='log') if log_scale else alt.Scale(type='linear')
 
-# Create the line chart using Altair with the selected y-axis scale
-line_chart = alt.Chart(filtered_elec_df).mark_line().encode(
-    x=alt.X('Year:O', title='Year'),
-    y=alt.Y('net consumption:Q', scale=y_axis_scale, title='Net Consumption (billions of kWh)'),
-    color='Country:N'
-).properties(
-    width=700,
-    height=400
-)
+    line_chart = alt.Chart(filtered_elec_df).mark_line().encode(
+        x=alt.X('Year:O', title='Year'),
+        y=alt.Y(f'{feature}:Q', scale=y_axis_scale, title=f'{feature.replace("_", " ").title()} ({long_units})'),
+        color='Country:N'
+    ).properties(
+        width=700,
+        height=400
+    )
+    
+    st.altair_chart(line_chart, use_container_width=True)
 
-st.altair_chart(line_chart, use_container_width=True)
+    st.subheader(f'{feature.replace("_", " ").title()} ({units}) in {to_year}\nPercent difference compared to {from_year}', divider='gray')
 
-first_year = elec_df[elec_df['Year'] == from_year]
-last_year = elec_df[elec_df['Year'] == to_year]
+    cols = st.columns(4)
 
-st.subheader(f'Net Consumption (kWh) in {to_year}\nPercent difference compared to {from_year}', divider='gray')
+    for i, country in enumerate(selected_countries):
+        col = cols[i % len(cols)]
 
-cols = st.columns(4)
+        with col:
+            first_data = first_year[first_year['Country'] == country][feature].iat[0]
+            last_data = last_year[last_year['Country'] == country][feature].iat[0]
 
-for i, country in enumerate(selected_countries):
-    col = cols[i % len(cols)]
+            if math.isnan(first_data):
+                growth = 'n/a'
+                delta_color = 'off'
+            else:
+                growth = f'{100*(last_data-first_data) / first_data:,.1f}%'
+                delta_color = 'normal'
 
-    with col:
-        first_data = first_year[first_year['Country'] == country]['net consumption'].iat[0]
-        last_data = last_year[last_year['Country'] == country]['net consumption'].iat[0]
+            st.metric(
+                label=f'{country}',
+                value=f'{last_data:,.0f}{short_units}',
+                delta=growth,
+                delta_color=delta_color
+            )
 
-        if math.isnan(first_data):
-            growth = 'n/a'
-            delta_color = 'off'
-        else:
-            growth = f'{100*(last_data-first_data) / first_data:,.1f}%'
-            delta_color = 'normal'
 
-        st.metric(
-            label=f'{country}',
-            value=f'{last_data:,.0f}B',
-            delta=growth,
-            delta_color=delta_color
-        )
+
+
